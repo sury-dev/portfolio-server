@@ -22,7 +22,13 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("invalid server configuration: %w", err)
 	}
 
+	loggingConfig, err := loadLoggingConfig(file.Section(loggingSection))
+	if err != nil {
+		return nil, fmt.Errorf("invalid logging configuration: %w", err)
+	}
+
 	return &Config{
-		Server: serverConfig,
+		Server:  serverConfig,
+		Logging: loggingConfig,
 	}, nil
 }
