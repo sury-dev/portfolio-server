@@ -6,6 +6,7 @@ import (
 
 	"github.com/sury-dev/portfolio-server/internal/config"
 	"github.com/sury-dev/portfolio-server/internal/logger"
+	"github.com/sury-dev/portfolio-server/internal/server"
 )
 
 const defaultConfigPath = "configs/config.conf"
@@ -29,7 +30,12 @@ func main() {
 		}
 	}()
 
-	logger.Info().Msg("configuration loaded")
-	logger.Info().Msgf("server=%+v", cfg.Server)
-	logger.Info().Msgf("logging=%+v", cfg.Logging)
+	srv, err := server.NewServer(cfg, logger)
+	if err != nil {
+		log.Fatalf("error creating server: %v", err)
+	}
+
+	if err := srv.Start(); err != nil {
+		log.Fatalf("error starting server: %v", err)
+	}
 }

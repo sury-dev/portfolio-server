@@ -23,30 +23,31 @@ import (
 // no-op; for a file it closes the handle. If a later step fails after a file
 // was opened, NewLogger closes it before returning the error so the caller
 // does not have to.
-func NewLogger(cfg config.LoggingConfig, service string) (*zerolog.Logger, func() error, error) {
+func NewLogger(cfg config.LoggingConfig, service string) (zerolog.Logger, func() error, error) {
 	level, err := parseLogLevel(cfg.Level)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid log level: %w", err)
+		return zerolog.Logger{}, nil, fmt.Errorf("invalid log level: %w", err)
 	}
 
 	writer, closer, err := createWriter(cfg.Output)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create writer: %w", err)
+		return zerolog.Logger{}, nil, fmt.Errorf("failed to create writer: %w", err)
 	}
 
 	output, err := createOutput(cfg.Format, writer)
 	if err != nil {
-		return nil, closer, fmt.Errorf("failed to create output: %w", err)
+		_ = closer()
+		return zerolog.Logger{}, closer, fmt.Errorf("failed to create output: %w", err)
 	}
 
 	// Timestamp and service identity are bound on the logger context so
 	// every event carries them without callers repeating the fields.
 	// service is SERVER.NAME: which process produced the line.
-	logger := zerolog.New(output).Level(level).With().
+	log := zerolog.New(output).Level(level).With().
 		Timestamp().
 		Str("service", service).
 		Logger()
-	return &logger, closer, nil
+	return log, closer, nil
 }
 
 // parseLogLevel maps the config vocabulary onto zerolog's levels.
