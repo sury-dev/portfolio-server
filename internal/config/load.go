@@ -27,8 +27,14 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("invalid logging configuration: %w", err)
 	}
 
+	databaseConfig, err := loadDatabaseConfig(file.Section(databaseSection))
+	if err != nil {
+		return nil, fmt.Errorf("invalid database configuration: %w", err)
+	}
+
 	return &Config{
 		Server:  serverConfig,
 		Logging: loggingConfig,
+		Database: databaseConfig,
 	}, nil
 }

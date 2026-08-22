@@ -5,6 +5,7 @@ import "time"
 type Config struct {
 	Server  ServerConfig
 	Logging LoggingConfig
+	Database DatabaseConfig
 }
 
 type ServerConfig struct {
@@ -20,3 +21,11 @@ type LoggingConfig struct {
 	Output string
 }
 
+type DatabaseConfig struct {
+	Host     string
+	Port     int
+	Name     string
+	User     string
+	Password string
+	SSLMode  string
+}
