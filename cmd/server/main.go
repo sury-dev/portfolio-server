@@ -20,22 +20,24 @@ func main() {
 		log.Fatalf("error loading config: %v", err)
 	}
 
-	logger, closer, err := logger.NewLogger(cfg.Logging, cfg.Server.Name)
+	appLogger, closer, err := logger.NewLogger(cfg.Logging, cfg.Server.Name)
 	if err != nil {
 		log.Fatalf("error creating logger: %v", err)
 	}
 	defer func() {
 		if err := closer(); err != nil {
-			log.Fatalf("error closing logger: %v", err)
+			log.Printf("error closing logger: %v", err)
 		}
 	}()
 
-	srv, err := server.NewServer(cfg, logger)
+	srv, err := server.NewServer(cfg, appLogger)
 	if err != nil {
-		log.Fatalf("error creating server: %v", err)
+		log.Printf("error creating server: %v", err)
+		return
 	}
+	defer srv.Close()
 
 	if err := srv.Start(); err != nil {
-		log.Fatalf("error starting server: %v", err)
+		log.Printf("error starting server: %v", err)
 	}
 }
