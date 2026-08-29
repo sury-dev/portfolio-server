@@ -3,9 +3,10 @@ package config
 import "time"
 
 type Config struct {
-	Server  ServerConfig
-	Logging LoggingConfig
+	Server   ServerConfig
+	Logging  LoggingConfig
 	Database DatabaseConfig
+	Auth     AuthConfig
 }
 
 type ServerConfig struct {
@@ -28,4 +29,12 @@ type DatabaseConfig struct {
 	User     string
 	Password string
 	SSLMode  string
+}
+
+type AuthConfig struct {
+	AccessSecretKey      string
+	RefreshSecretKey     string
+	AccessTokenDuration  time.Duration
+	RefreshTokenDuration time.Duration
+	CookieSecure         bool
 }
