@@ -69,6 +69,7 @@ The AI representative **reads** portfolio content (via a future Portfolio Servic
 | `Education` | Content | Academic / formal education entries |
 | `Certification` | Content | Credentials with issuer + dates |
 | `Achievement` | Content | Awards, highlights, notable wins |
+| `SocialPlatform` | Content | Catalog of allowed social / presence platforms |
 | `SocialLink` | Content | Public profile links (GitHub, LinkedIn, …) |
 | `ContactMessage` | Application | Inbound contact-form submissions |
 | `ChatSession` | Application | One visitor ↔ AI conversation thread |
@@ -393,7 +394,34 @@ Different presentation semantics: achievements are often timeline highlights, no
 
 ---
 
-### 4.11 SocialLink *(portfolio content)*
+### 4.11 SocialPlatform *(portfolio content)*
+
+Catalog of allowed social / presence platforms (metadata: slug, name, default logo, order).
+
+Email is **not** a platform — see `Profile.email_public`.
+
+**Properties**
+
+| Property | Notes |
+|----------|--------|
+| `id` | UUID PK |
+| `slug` | Unique internal key (`github`, `linkedin`, `x`, `youtube`) — must not be `email` |
+| `name` | Display label |
+| `logo_url` | Optional default platform icon |
+| `display_order` | Catalog / UI ordering |
+| `created_at` / `updated_at` | TIMESTAMPTZ |
+
+**Relationships**
+
+- One-to-many → `SocialLink`
+
+**Delete behavior (intended)**
+
+- `ON DELETE RESTRICT` while links still reference the platform
+
+---
+
+### 4.12 SocialLink *(portfolio content)*
 
 Represents one outbound social / presence link.
 
@@ -402,30 +430,25 @@ Represents one outbound social / presence link.
 | Property | Notes |
 |----------|--------|
 | `id` | UUID PK |
-| `platform` | Stable key for **social / presence** platforms only: `github`, `linkedin`, `x`, `youtube`, … |
+| `platform_id` | FK → `SocialPlatform` (required); unique — one link per platform |
 | `label` | Optional display override |
 | `url` | Required |
-| `logo_url` | Optional platform / custom icon image URL |
+| `logo_url` | Optional override of platform default icon |
 | `is_published` | Soft visibility; **DEFAULT FALSE** |
 | `display_order` | Icon/link order in footer/header |
 | `created_at` / `updated_at` | TIMESTAMPTZ |
 
 **Not a SocialLink**
 
-- **Email** — not a platform here. Public email belongs on `Profile.email_public`; contact-form email is `ContactMessage.email`.
+- **Email** — not a platform. Public email belongs on `Profile.email_public`; contact-form email is `ContactMessage.email`.
 
-**Constraints intent**
+**Why a platforms table?**
 
-- Unique `platform` **or** unique `(platform, url)` — prefer unique `platform` if you only ever want one GitHub link.
-- `platform` values exclude `email`.
-
-**Why not put these on Profile as columns?**
-
-A variable list of links changes over time; a small table avoids `github_url`, `twitter_url`, … column sprawl.
+Platforms need shared metadata (name, default logo, order). A lookup table is clearer than rewriting CHECK constraints when platforms are added.
 
 ---
 
-### 4.12 ContactMessage *(application data)*
+### 4.13 ContactMessage *(application data)*
 
 Inbound message from the contact form.
 
@@ -452,7 +475,7 @@ Inbound message from the contact form.
 
 ---
 
-### 4.13 ChatSession *(application data)*
+### 4.14 ChatSession *(application data)*
 
 One conversation thread between a visitor and the AI representative.
 
@@ -477,7 +500,7 @@ Session telemetry is semi-structured and product-specific. Portfolio content tab
 
 ---
 
-### 4.14 ChatMessage *(application data)*
+### 4.15 ChatMessage *(application data)*
 
 One message in a chat session.
 
@@ -521,7 +544,8 @@ SkillCategory ──── 1:N ──── Skills
 Education               (standalone content)
 Certification           (standalone content)
 Achievement             (standalone content)
-SocialLink              (standalone content; no email platform)
+
+SocialPlatform ──── 1:N ──── SocialLink
 
 
 ContactMessage          (standalone application data)
@@ -535,6 +559,7 @@ ChatSession ──── 1:N ──── ChatMessage
 | From | To | Type | Implementation |
 |------|----|------|----------------|
 | SkillCategory | Skill | one-to-many | `skills.category_id` FK |
+| SocialPlatform | SocialLink | one-to-many | `social_links.platform_id` FK |
 | Project | Skill | many-to-many | `project_skills` join table |
 | Experience | Skill | many-to-many | `experience_skills` join table |
 | ChatSession | ChatMessage | one-to-many | `chat_messages.session_id` FK |
@@ -678,14 +703,13 @@ Schema consequences:
 | `ContactMessage.is_read` | **Not in v1** |
 | `ChatSession.ended_at` | **Keep, nullable** |
 | `is_featured` on Experience / Education / Achievement | **Not in v1** |
+| Social platforms | **`social_platforms` table**; one `social_links` row per platform |
+| Profile singleton | Enforced in DB — see [`ddl-design.md`](./ddl-design.md) |
+| Chat `metadata` | **Minimal JSONB** on `chat_sessions` |
 
 ## 13. Remaining open decisions
 
-Please challenge these before SQL:
-
-1. **`Profile` singleton table** — keep, or store identity in config until an admin UI exists?
-2. **`SocialLink` unique on `platform`** — one link per platform?
-3. **Chat `metadata` JSONB** — allow minimal JSONB, or force all columns relational from day one?
+None blocking DDL design — review [`ddl-design.md`](./ddl-design.md) next.
 
 ---
 
@@ -697,6 +721,6 @@ Please challenge these before SQL:
 - [x] Relationship diagram and cardinalities
 - [x] Identifier / timestamp / visibility / ordering policy
 - [x] Constraint & index *intent* (no DDL yet)
-- [ ] Stakeholder review / approval ← **you are here**
+- [ ] Stakeholder review / approval of domain + DDL design ← **you are here**
 - [ ] Then: `000002` up/down migrations and migrate/rollback verification
 ```
