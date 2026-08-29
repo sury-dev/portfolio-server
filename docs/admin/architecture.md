@@ -57,9 +57,10 @@ Admin API
 └────────────────────────────┬─────────────────────────────┘
                              │
 ┌────────────────────────────┴─────────────────────────────┐
-│  Config (signing / TTL only — NOT the password)          │
-│  JWT_ACCESS_SECRET / JWT_REFRESH_SECRET (if JWT used)    │
-│  ACCESS_TOKEN_TTL / REFRESH_TOKEN_TTL                    │
+│  Config [AUTH] (signing / TTL / cookie — NOT password)   │
+│  ACCESS_SECRET_KEY / REFRESH_SECRET_KEY (≥32 chars)      │
+│  ACCESS_TOKEN_DURATION / REFRESH_TOKEN_DURATION          │
+│  COOKIE_SECURE                                           │
 └────────────────────────────┬─────────────────────────────┘
                              │
                              ▼
@@ -87,7 +88,7 @@ Column                    Type          Null?    Notes
 -------------------------------------------------------------------
 id                        UUID          NO       PK, default gen_random_uuid()
 lock_key                  BOOLEAN       NO       DEFAULT TRUE; UNIQUE; CHECK (lock_key)
-password_hash             TEXT          NO       argon2id / bcrypt hash
+password_hash             TEXT          NO       bcrypt hash (project standard)
 access_token_hash         TEXT          YES      hash of current access token (NULL = logged out)
 refresh_token_hash        TEXT          YES      hash of current refresh token
 access_token_expires_at   TIMESTAMPTZ   YES
@@ -151,7 +152,7 @@ admin status                # row exists? password set? session active? (no secr
 
 ```text
 1. Connect using existing DATABASE config
-2. Hash password with argon2id (preferred) or bcrypt
+2. Hash password with bcrypt (project standard)
 3. UPSERT the singleton admin row:
      - if no row → INSERT (password_hash, lock_key=TRUE)
      - if row exists → UPDATE password_hash, updated_at
@@ -184,25 +185,29 @@ Login B  →  tokens_B overwrite tokens_A
 
 There is no multi-session table. The singleton row **is** the session.
 
-### 5.2 Access token
+### 5.2 Committed token architecture: JWT + DB hash
 
-| Property | Choice |
-|----------|--------|
-| Format | JWT (signed with config secret) **or** opaque random string |
-| Lifetime | Short (minutes) |
-| Client header | `Authorization: Bearer <access_token>` |
-| Server validation | Signature/expiry (if JWT) **and** `hash(token) == admin.access_token_hash` **and** not expired |
+We deliberately use **HS256 JWTs** for both access and refresh, plus DB hash checks:
 
-DB check is mandatory so an overwritten session cannot keep using an old access token until TTL.
+```text
+JWT signature + exp + typ
+        AND
+SHA256(raw JWT) == current hash on admin row
+```
 
-### 5.3 Refresh token
+This keeps immediate invalidation when login overwrites session hashes.
 
-| Property | Choice |
-|----------|--------|
-| Format | Opaque random string (recommended) |
-| Lifetime | Longer (days) |
-| Purpose | Mint a new access token without password |
-| Server validation | `hash(token) == admin.refresh_token_hash` and not expired |
+| Property | Access | Refresh |
+|----------|--------|---------|
+| Format | JWT HS256 | JWT HS256 |
+| Secret | `ACCESS_SECRET_KEY` | `REFRESH_SECRET_KEY` (must differ) |
+| Claim `typ` | `access` | `refresh` |
+| Lifetime | Short (`ACCESS_TOKEN_DURATION`) | Longer (`REFRESH_TOKEN_DURATION` > access) |
+| Transport | HttpOnly cookie `access_token`, path `/admin` | HttpOnly cookie `refresh_token`, path `/admin/auth/refresh` |
+| Validator | `ValidateAccessToken` (typ must be access) | `ValidateRefreshToken` (typ must be refresh) |
+| DB check | `SHA256(token) == access_token_hash` | `SHA256(token) == refresh_token_hash` |
+
+Do **not** use one generic “valid JWT” helper — always enforce `typ` and the matching secret.
 
 Refresh also **overwrites** access (and typically rotates refresh) on the same row.
 
@@ -237,14 +242,14 @@ Login
        ├── fail → 401
        └── ok  → mint access + refresh
                 OVERWRITE token hashes + expiries on admin row
-                return raw tokens to client
+                set HttpOnly cookies (not JSON body)
 
 
 Authenticated request
-  Bearer access
+  Cookie access_token (path /admin)
        │
        ▼
-  verify token + hash match admin.access_token_hash + not expired
+  ValidateAccessToken: sig + exp + typ=access + DB hash match
        │
        ├── fail → 401
        └── ok   → CRUD handler
@@ -286,19 +291,19 @@ Public routes do not use this middleware.
 ## 8. Config that remains (non-password)
 
 ```text
-[ADMIN]
-JWT_ACCESS_SECRET = ...
-JWT_REFRESH_SECRET = ...      # if refresh is also JWT; omit if opaque-only
-ACCESS_TOKEN_TTL_SEC = 900
-REFRESH_TOKEN_TTL_SEC = 604800
+[AUTH]
+ACCESS_SECRET_KEY = <≥32 chars high-entropy>
+REFRESH_SECRET_KEY = <≥32 chars high-entropy, different>
+ACCESS_TOKEN_DURATION = 15m
+REFRESH_TOKEN_DURATION = 168h
+COOKIE_SECURE = false   # true in HTTPS production
 ```
 
 | In config | In database (`admin`) |
 |-----------|------------------------|
-| Signing secrets | `password_hash` |
-| Token TTLs | Current session token hashes + expiries |
-
-If both access and refresh are opaque DB-backed tokens, signing secrets can be omitted — still keep TTLs in config.
+| Signing secrets (≥32 chars each, must differ) | `password_hash` (bcrypt) |
+| Token TTLs (refresh > access > 0) | Current session token hashes + expiries |
+| `COOKIE_SECURE` | — |
 
 ---
 

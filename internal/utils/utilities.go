@@ -1,8 +1,13 @@
 package utils
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"crypto/sha256"
+	"encoding/hex"
 
-func HashString(str string) (string, error) {
+	"golang.org/x/crypto/bcrypt"
+)
+
+func EncryptString(str string) (string, error) {
 	hashedStr, err := bcrypt.GenerateFromPassword([]byte(str), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
@@ -10,6 +15,11 @@ func HashString(str string) (string, error) {
 	return string(hashedStr), nil
 }
 
-func CompareString(hashedStr, str string) error {
+func CompareEncryptedString(hashedStr, str string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hashedStr), []byte(str))
+}
+
+func HashSHA256(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }

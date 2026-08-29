@@ -4,10 +4,12 @@ go 1.26.6
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.15
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/crypto v0.45.0
+	golang.org/x/term v0.45.0
 	gopkg.in/ini.v1 v1.67.3
 )
 
@@ -28,6 +30,5 @@ require (
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 )

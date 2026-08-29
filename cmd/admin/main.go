@@ -55,7 +55,7 @@ func main() {
 			log.Fatalf("error reading password: %v", err)
 		}
 
-		hashedPassword, err := utils.HashString(password)
+		hashedPassword, err := utils.EncryptString(password)
 		if err != nil {
 			log.Fatalf("error hashing password: %v", err)
 		}

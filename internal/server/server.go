@@ -40,8 +40,6 @@ func NewServer(cfg *config.Config, logger zerolog.Logger) (*Server, error) {
 		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
 	}))
 
-	app.Get("/health", handler.HealthCheck)
-
 	db, err := database.Connect(ctx, cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -52,12 +50,15 @@ func NewServer(cfg *config.Config, logger zerolog.Logger) (*Server, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &Server{
+	s := &Server{
 		cfg:    cfg,
 		logger: logger,
 		app:    app,
 		db:     db,
-	}, nil
+	}
+	s.registerRoutes()
+
+	return s, nil
 }
 
 func (s *Server) Start() error {

@@ -24,11 +24,12 @@ This document answers:
 Password is **not** in config.
 
 ```text
-[ADMIN]
-JWT_ACCESS_SECRET = <random>       # if access tokens are JWTs
-JWT_REFRESH_SECRET = <random>      # optional / omit for opaque refresh
-ACCESS_TOKEN_TTL_SEC = 900
-REFRESH_TOKEN_TTL_SEC = 604800
+[AUTH]
+ACCESS_SECRET_KEY = <openssl rand -base64 48>
+REFRESH_SECRET_KEY = <openssl rand -base64 48>   # must differ
+ACCESS_TOKEN_DURATION = 15m
+REFRESH_TOKEN_DURATION = 168h
+COOKIE_SECURE = false   # true behind HTTPS
 ```
 
 Database connection still comes from existing `[DATABASE]` config (CLI and API both use it).
@@ -44,7 +45,7 @@ Internal steps:
 
 ```text
 1. Read password from prompt (preferred)
-2. Hash with argon2id (or project-standard hasher)
+2. Hash with bcrypt (project standard)
 3. UPSERT admin singleton:
      password_hash = <hash>
      clear access_* and refresh_* session columns
@@ -150,9 +151,9 @@ Content-Type: application/json
 Authorization: Bearer <access_token>
         │
         ▼
-1. Parse / verify token structure (JWT sig if applicable)
-2. Hash raw token
-3. Load admin row
+1. ValidateAccessToken: JWT sig + exp + typ=access
+2. Hash raw token (SHA-256)
+3. Load admin session
 4. Require hash == access_token_hash
 5. Require now < access_token_expires_at
         │

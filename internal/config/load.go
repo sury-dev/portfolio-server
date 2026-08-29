@@ -32,9 +32,15 @@ func Load(configPath string) (*Config, error) {
 		return nil, fmt.Errorf("invalid database configuration: %w", err)
 	}
 
+	authConfig, err := loadAuthConfig(file.Section(authSection))
+	if err != nil {
+		return nil, fmt.Errorf("invalid auth configuration: %w", err)
+	}
+
 	return &Config{
-		Server:  serverConfig,
-		Logging: loggingConfig,
+		Server:   serverConfig,
+		Logging:  loggingConfig,
 		Database: databaseConfig,
+		Auth:     authConfig,
 	}, nil
 }

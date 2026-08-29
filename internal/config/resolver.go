@@ -82,6 +82,32 @@ func ResolveSeconds(section, key string, fileKey *ini.Key, defaultValue time.Dur
 	return time.Duration(seconds) * time.Second, nil
 }
 
+// ResolveDuration resolves a Go duration string (e.g. 15m, 168h) or a plain
+// integer number of seconds. Precedence is environment, then file, then default.
+func ResolveDuration(section, key string, fileKey *ini.Key, defaultValue time.Duration) (time.Duration, error) {
+	raw, source, found := lookup(section, key, fileKey)
+	if !found {
+		return defaultValue, nil
+	}
+	if raw == "" {
+		return 0, fmt.Errorf("%s is set but empty", source)
+	}
+	if seconds, err := strconv.Atoi(raw); err == nil {
+		if seconds < 0 {
+			return 0, fmt.Errorf("%s must be non-negative, got %q", source, raw)
+		}
+		return time.Duration(seconds) * time.Second, nil
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a duration (e.g. 15m, 168h) or seconds, got %q", source, raw)
+	}
+	if value < 0 {
+		return 0, fmt.Errorf("%s must be non-negative, got %q", source, raw)
+	}
+	return value, nil
+}
+
 // ResolveBool resolves a bool value.
 // Precedence is environment variable, then config file, then defaultValue.
 // A key that is present but empty or not a boolean is rejected.
